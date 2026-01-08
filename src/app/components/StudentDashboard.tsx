@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { User, Order } from '../App';
+import { useState, useEffect } from 'react';
+import type { User, Order, Product } from '../App';
 import { ProductCatalog } from './ProductCatalog';
 import { Cart } from './Cart';
 import { OrderHistory } from './OrderHistory';
@@ -10,15 +10,44 @@ interface StudentDashboardProps {
   orders: Order[];
   onLogout: () => void;
   onPlaceOrder: (order: Order) => void;
+  onUpdateBalance: (newBalance: number) => void;
 }
 
 type Tab = 'catalog' | 'cart' | 'orders' | 'profile';
 
-export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: StudentDashboardProps) {
+export function StudentDashboard({ 
+  user, 
+  orders, 
+  onLogout, 
+  onPlaceOrder, 
+  onUpdateBalance 
+}: StudentDashboardProps) {
+  
   const [activeTab, setActiveTab] = useState<Tab>('catalog');
-  const [cartItems, setCartItems] = useState<any[]>([]);
+  // Estado para o Modal de Aviso
+  const [alertModal, setAlertModal] = useState<{ isOpen: boolean; message: string }>({
+    isOpen: false,
+    message: ''
+  });
 
-  const handleAddToCart = (product: any) => {
+  const [cartItems, setCartItems] = useState<any[]>(() => {
+    const savedCart = localStorage.getItem(`sesi_cart_${user.id}`);
+    if (savedCart) {
+      try {
+        return JSON.parse(savedCart);
+      } catch (error) {
+        console.error("Erro ao ler carrinho:", error);
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`sesi_cart_${user.id}`, JSON.stringify(cartItems));
+  }, [cartItems, user.id]);
+
+  const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
       setCartItems(cartItems.map(item =>
@@ -32,7 +61,7 @@ export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: Stude
     setActiveTab('cart');
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = (productId: number, quantity: number) => {
     if (quantity === 0) {
       setCartItems(cartItems.filter(item => item.product.id !== productId));
     } else {
@@ -42,31 +71,80 @@ export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: Stude
     }
   };
 
-  const handleCheckout = (paymentMethod: string) => {
-    // Generate pickup code from last 4 digits of phone
-    const pickupCode = user.phone?.slice(-4) || '0000';
-    
-    const order: Order = {
-      id: Date.now().toString(),
+  const handleCheckout = async (paymentMethod: string) => {
+    const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+    // Validação local de saldo
+    if (paymentMethod === 'balance' && (user.balance || 0) < total) {
+      setAlertModal({ isOpen: true, message: "Saldo Insuficiente" });
+      return;
+    }
+
+    const pedidoRequest = {
       userId: user.id,
-      userName: user.name,
-      userPhone: user.phone,
-      items: cartItems,
-      total: cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      status: 'pending',
-      paymentMethod,
-      createdAt: new Date().toISOString(),
-      pickupCode
+      paymentMethod: paymentMethod.toUpperCase(),
+      items: cartItems.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity
+      }))
     };
-    onPlaceOrder(order);
-    setCartItems([]);
-    setActiveTab('orders');
+
+    try {
+      const response = await fetch('http://localhost:8080/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pedidoRequest)
+      });
+
+      if (response.ok) {
+        const orderData = await response.json();
+
+        if (paymentMethod === 'balance') {
+          onUpdateBalance(user.balance - total);
+        }
+
+        onPlaceOrder(orderData);
+        setCartItems([]); 
+        localStorage.removeItem(`sesi_cart_${user.id}`);
+        setActiveTab('orders');
+        setAlertModal({ isOpen: true, message: "Pedido realizado com sucesso!" });
+      } else {
+        const errorText = await response.text();
+        
+        // Verificação de mensagens do servidor para exibição amigável
+        if (errorText.includes("Estoque insuficiente")) {
+          setAlertModal({ isOpen: true, message: "Estoque Insuficiente" });
+        } else if (errorText.includes("Saldo insuficiente") || errorText.includes("balance")) {
+          setAlertModal({ isOpen: true, message: "Saldo Insuficiente" });
+        } else {
+          setAlertModal({ isOpen: true, message: "Erro ao processar pedido: " + errorText });
+        }
+      }
+    } catch (error) {
+      setAlertModal({ isOpen: true, message: "Erro ao conectar com o servidor da cantina." });
+    }
   };
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Modal de Aviso */}
+      {alertModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Aviso</h3>
+            <p className="text-gray-600 mb-6">{alertModal.message}</p>
+            <button
+              onClick={() => setAlertModal({ ...alertModal, isOpen: false })}
+              className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,7 +168,6 @@ export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: Stude
               <button
                 onClick={onLogout}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
-                title="Sair"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -109,26 +186,22 @@ export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: Stude
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation */}
       <nav className="bg-white border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8 overflow-x-auto">
             <button
               onClick={() => setActiveTab('catalog')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition ${
-                activeTab === 'catalog'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'catalog' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
               }`}
             >
               🍴 Cardápio
             </button>
             <button
               onClick={() => setActiveTab('cart')}
-              className={`relative py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition ${
-                activeTab === 'cart'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`relative py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'cart' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
               }`}
             >
               🛒 Carrinho
@@ -140,20 +213,16 @@ export function StudentDashboard({ user, orders, onLogout, onPlaceOrder }: Stude
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition ${
-                activeTab === 'orders'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'orders' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
               }`}
             >
               📋 Meus Pedidos
             </button>
             <button
               onClick={() => setActiveTab('profile')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition ${
-                activeTab === 'profile'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'profile' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
               }`}
             >
               👤 Perfil

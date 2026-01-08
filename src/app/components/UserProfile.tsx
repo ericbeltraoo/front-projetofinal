@@ -29,7 +29,7 @@ export function UserProfile({ user, orders }: UserProfileProps) {
             </div>
             <div className="mb-4">
               <h3 className="text-2xl font-bold text-gray-900">{user.name}</h3>
-              <p className="text-gray-600">{user.class}</p>
+              <p className="text-gray-600">{user.className || 'Turma não informada'}</p>
             </div>
           </div>
 
@@ -38,9 +38,23 @@ export function UserProfile({ user, orders }: UserProfileProps) {
               <p className="text-sm text-gray-500 mb-1">Email</p>
               <p className="font-medium text-gray-900">{user.email}</p>
             </div>
+
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-500 mb-1">Turma</p>
-              <p className="font-medium text-gray-900">{user.class}</p>
+              <p className="font-medium text-gray-900">{user.className || '---'}</p>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-500 mb-1">Matrícula</p>
+              {/* Puxa diretamente da coluna 'registration' do seu banco */}
+              <p className="font-medium text-gray-900">{user.registration || 'Não encontrada'}</p>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-500 mb-1">Telefone</p>
+              <p className="font-medium text-gray-900">
+                {user.phone ? user.phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3') : 'Não cadastrado'}
+              </p>
             </div>
           </div>
         </div>
@@ -103,7 +117,7 @@ export function UserProfile({ user, orders }: UserProfileProps) {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions (Estrutura original preservada) */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="font-bold text-gray-900 mb-4">Ações Rápidas</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

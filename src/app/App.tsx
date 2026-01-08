@@ -1,25 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Login } from './components/Login';
+import { Register } from './components/Register';
 import { StudentDashboard } from './components/StudentDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 
 export interface User {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
-  role: 'student' | 'admin';
-  class?: string;
-  balance?: number;
+  role: 'STUDENT' | 'ADMIN'; 
+  className?: string;
+  balance: number;
+  phone?: string;
+  registration?: string;
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   description: string;
   price: number;
   category: string;
   image: string;
   available: boolean;
+  stock: number;
 }
 
 export interface CartItem {
@@ -28,79 +32,181 @@ export interface CartItem {
 }
 
 export interface Order {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId: string | number;
   userName: string;
-  items: CartItem[];
+  items: any[];
   total: number;
   status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
   paymentMethod: string;
   createdAt: string;
+  pickupCode?: string;
 }
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
+  // 1. Carregar usuário do LocalStorage ao iniciar
   useEffect(() => {
-    // Load user from localStorage
     const savedUser = localStorage.getItem('sesiUser');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
-
-    // Load orders from localStorage
-    const savedOrders = localStorage.getItem('sesiOrders');
-    if (savedOrders) {
-      setOrders(JSON.parse(savedOrders));
-    }
   }, []);
 
-  const handleLogin = (loggedUser: User) => {
+  // 2. Buscar Produtos do Banco de Dados
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/produtos');
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar produtos:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // 3. Buscar pedidos da API (MySQL)
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchOrders = async () => {
+      try {
+        const url = user.role === 'ADMIN' 
+          ? 'http://localhost:8080/api/pedidos' 
+          : `http://localhost:8080/api/pedidos/usuario/${user.id}`;
+          
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setOrders(data);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar pedidos do banco:", error);
+      }
+    };
+
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // --- FUNÇÕES DE PRODUTOS (BACKEND) ---
+
+  // EXCLUIR PRODUTO
+  const handleDeleteProduct = async (productId: string | number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/produtos/${productId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Remove da lista local para atualizar a interface imediatamente
+        setProducts(prev => prev.filter(p => p.id.toString() !== productId.toString()));
+      } else {
+        alert("Erro ao excluir produto no banco de dados.");
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Servidor offline ou erro de rede.");
+    }
+  };
+
+  // ATUALIZAR ESTOQUE
+  const handleUpdateStock = async (productId: string | number, newStock: number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/produtos/${productId}/estoque?quantidade=${newStock}`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setProducts(prev => prev.map(p => 
+          p.id.toString() === productId.toString() ? { ...p, stock: newStock } : p
+        ));
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar estoque:", error);
+    }
+  };
+
+  // --- FUNÇÕES DE USUÁRIO E PEDIDOS ---
+
+  const handleAuthSuccess = (loggedUser: User) => {
     setUser(loggedUser);
+    setIsRegistering(false);
     localStorage.setItem('sesiUser', JSON.stringify(loggedUser));
   };
 
   const handleLogout = () => {
     setUser(null);
+    setOrders([]);
     localStorage.removeItem('sesiUser');
   };
 
-  const handlePlaceOrder = (order: Order) => {
-    const updatedOrders = [...orders, order];
-    setOrders(updatedOrders);
-    localStorage.setItem('sesiOrders', JSON.stringify(updatedOrders));
+  const handlePlaceOrder = (newOrder: Order) => {
+    setOrders(prev => [newOrder, ...prev]);
   };
 
-  const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
-    const updatedOrders = orders.map(order =>
-      order.id === orderId ? { ...order, status } : order
-    );
-    setOrders(updatedOrders);
-    localStorage.setItem('sesiOrders', JSON.stringify(updatedOrders));
+  const handleUpdateOrderStatus = async (orderId: string | number, status: Order['status']) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/pedidos/${orderId}/status?novoStatus=${status}`, {
+        method: 'PATCH'
+      });
+      
+      if (response.ok) {
+        setOrders(prev => prev.map(order =>
+          order.id === orderId ? { ...order, status } : order
+        ));
+      }
+    } catch (error) {
+      alert("Erro ao atualizar status no servidor.");
+    }
   };
+
+  const handleUpdateBalance = (newBalance: number) => {
+    if (user) {
+      const updatedUser = { ...user, balance: newBalance };
+      setUser(updatedUser);
+      localStorage.setItem('sesiUser', JSON.stringify(updatedUser));
+    }
+  };
+
+  // --- Roteamento ---
 
   if (!user) {
-    return <Login onLogin={handleLogin} />;
+    if (isRegistering) {
+      return <Register onRegister={handleAuthSuccess} onBackToLogin={() => setIsRegistering(false)} />;
+    }
+    return <Login onLogin={handleAuthSuccess} onGoToRegister={() => setIsRegistering(true)} />;
   }
 
-  if (user.role === 'admin') {
-    return (
-      <AdminDashboard
-        user={user}
-        orders={orders}
-        onLogout={handleLogout}
-        onUpdateOrderStatus={handleUpdateOrderStatus}
-      />
-    );
-  }
-
-  return (
+  return user.role === 'ADMIN' ? (
+    <AdminDashboard
+      user={user}
+      products={products}
+      orders={orders}
+      onLogout={handleLogout}
+      onUpdateOrderStatus={handleUpdateOrderStatus}
+      onDeleteProduct={handleDeleteProduct}
+      onUpdateStock={handleUpdateStock}
+      onAddProduct={() => fetchProducts()} // Recarrega após adicionar
+    />
+  ) : (
     <StudentDashboard
       user={user}
-      orders={orders.filter(o => o.userId === user.id)}
+      products={products}
+      orders={orders}
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
+      onUpdateBalance={handleUpdateBalance}
     />
   );
 }
