@@ -1,30 +1,43 @@
 import { useState, useEffect } from 'react';
-import type { User, Order, Product } from '../App';
+import type { User, Order, Product, SupportMessage } from '../App';
 import { ProductCatalog } from './ProductCatalog';
 import { Cart } from './Cart';
 import { OrderHistory } from './OrderHistory';
 import { UserProfile } from './UserProfile';
+import { AddBalance } from './AddBalance';
+import { FavoriteProducts } from './FavoriteProducts';
+import { Support } from './Support';
 
 interface StudentDashboardProps {
   user: User;
+  products: Product[];
   orders: Order[];
+  supportMessages: SupportMessage[];
   onLogout: () => void;
   onPlaceOrder: (order: Order) => void;
   onUpdateBalance: (newBalance: number) => void;
+  onToggleFavorite: (productId: string | number) => void;
+  onSendSupportMessage: (message: Omit<SupportMessage, 'id' | 'createdAt' | 'status'>) => void;
+  onCancelOrder: (orderId: string | number, reason: string) => Promise<void>; // ADICIONADO
 }
 
-type Tab = 'catalog' | 'cart' | 'orders' | 'profile';
+type Tab = 'catalog' | 'cart' | 'orders' | 'profile' | 'addBalance' | 'favorites' | 'support';
 
 export function StudentDashboard({ 
   user, 
+  products,
   orders, 
+  supportMessages,
   onLogout, 
   onPlaceOrder, 
-  onUpdateBalance 
+  onUpdateBalance,
+  onToggleFavorite,
+  onSendSupportMessage,
+  onCancelOrder // ADICIONADO
 }: StudentDashboardProps) {
   
   const [activeTab, setActiveTab] = useState<Tab>('catalog');
-  // Estado para o Modal de Aviso
+  
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; message: string }>({
     isOpen: false,
     message: ''
@@ -74,7 +87,6 @@ export function StudentDashboard({
   const handleCheckout = async (paymentMethod: string) => {
     const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-    // Validação local de saldo
     if (paymentMethod === 'balance' && (user.balance || 0) < total) {
       setAlertModal({ isOpen: true, message: "Saldo Insuficiente" });
       return;
@@ -110,8 +122,6 @@ export function StudentDashboard({
         setAlertModal({ isOpen: true, message: "Pedido realizado com sucesso!" });
       } else {
         const errorText = await response.text();
-        
-        // Verificação de mensagens do servidor para exibição amigável
         if (errorText.includes("Estoque insuficiente")) {
           setAlertModal({ isOpen: true, message: "Estoque Insuficiente" });
         } else if (errorText.includes("Saldo insuficiente") || errorText.includes("balance")) {
@@ -122,6 +132,26 @@ export function StudentDashboard({
       }
     } catch (error) {
       setAlertModal({ isOpen: true, message: "Erro ao conectar com o servidor da cantina." });
+    }
+  };
+
+  const handleAddBalanceAmount = async (amount: number) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/users/${user.id}/adicionar-saldo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amount })
+      });
+
+      if (response.ok) {
+        const newBalance = (user.balance || 0) + amount;
+        onUpdateBalance(newBalance);
+      } else {
+        throw new Error("Erro ao processar recarga");
+      }
+    } catch (error) {
+      console.error("Erro de conexão:", error);
+      throw error;
     }
   };
 
@@ -168,6 +198,7 @@ export function StudentDashboard({
               <button
                 onClick={onLogout}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+                title="Sair"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -178,62 +209,43 @@ export function StudentDashboard({
         </div>
       </header>
 
-      {/* Mobile Balance */}
-      <div className="sm:hidden bg-green-50 border-b border-green-100 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-green-700">Saldo disponível</span>
-          <span className="font-bold text-green-600">R$ {user.balance?.toFixed(2)}</span>
-        </div>
-      </div>
-
-      {/* Navigation */}
+      {/* Navigation Tabs */}
       <nav className="bg-white border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('catalog')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'catalog' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
-              }`}
-            >
-              🍴 Cardápio
-            </button>
-            <button
-              onClick={() => setActiveTab('cart')}
-              className={`relative py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'cart' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
-              }`}
-            >
-              🛒 Carrinho
-              {cartItemCount > 0 && (
-                <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartItemCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'orders' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
-              }`}
-            >
-              📋 Meus Pedidos
-            </button>
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === 'profile' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500'
-              }`}
-            >
-              👤 Perfil
-            </button>
+          <div className="flex space-x-8 overflow-x-auto pb-1 hide-scrollbar">
+            {[
+              { id: 'catalog', label: '🍴 Cardápio' },
+              { id: 'cart', label: `🛒 Carrinho ${cartItemCount > 0 ? `(${cartItemCount})` : ''}` },
+              { id: 'orders', label: '📋 Pedidos' },
+              { id: 'profile', label: '👤 Perfil' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as Tab)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition ${
+                  activeTab === tab.id
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </nav>
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'catalog' && <ProductCatalog onAddToCart={handleAddToCart} />}
+        {activeTab === 'catalog' && (
+          <ProductCatalog 
+            products={products} 
+            user={user} 
+            onAddToCart={handleAddToCart} 
+            onToggleFavorite={onToggleFavorite}
+          />
+        )}
+        
         {activeTab === 'cart' && (
           <Cart
             items={cartItems}
@@ -242,8 +254,46 @@ export function StudentDashboard({
             userBalance={user.balance || 0}
           />
         )}
-        {activeTab === 'orders' && <OrderHistory orders={orders} />}
-        {activeTab === 'profile' && <UserProfile user={user} orders={orders} />}
+        
+        {/* REPASSE DA FUNÇÃO PARA O ORDERHISTORY */}
+        {activeTab === 'orders' && (
+          <OrderHistory orders={orders} onCancelOrder={onCancelOrder} />
+        )}
+        
+        {activeTab === 'profile' && (
+          <UserProfile 
+            user={user} 
+            orders={orders} 
+            onNavigate={(tab: any) => setActiveTab(tab)}
+          />
+        )}
+        
+        {activeTab === 'addBalance' && (
+          <AddBalance 
+            user={user}
+            onAddBalance={handleAddBalanceAmount} 
+            onBack={() => setActiveTab('profile')}
+          />
+        )}
+        
+        {activeTab === 'favorites' && (
+          <FavoriteProducts 
+            user={user}
+            products={products}
+            onAddToCart={handleAddToCart}
+            onToggleFavorite={onToggleFavorite}
+            onBack={() => setActiveTab('profile')}
+          />
+        )}
+        
+        {activeTab === 'support' && (
+          <Support 
+            user={user}
+            onSendSupportMessage={onSendSupportMessage} 
+            onBack={() => setActiveTab('profile')}
+            messages={supportMessages}
+          />
+        )}
       </main>
     </div>
   );

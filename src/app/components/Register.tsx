@@ -53,19 +53,16 @@ export function Register({ onRegister, onBackToLogin }: RegisterProps) {
     setError('');
 
     try {
-      // ENVIANDO PARA O BACKEND JAVA
       const response = await axios.post('http://localhost:8080/api/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
         className: formData.class, 
         phone: formData.phone.replace(/\D/g, ''),
-        // AJUSTE AQUI: Removido o comentário para enviar a matrícula
         registration: formData.registration 
       });
 
       if (response.data.success) {
-        // Sucesso: O usuário agora existe no MySQL com a matrícula
         onRegister(response.data.user);
       } else {
         setError(response.data.message || 'Erro ao cadastrar');
@@ -79,33 +76,33 @@ export function Register({ onRegister, onBackToLogin }: RegisterProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full shadow-lg mb-4">
-            <svg className="w-12 h-12 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-full mb-4 shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Cantina Sesi</h1>
+            <p className="text-gray-600 mt-2">Crie sua conta para fazer pedidos</p>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Criar Conta</h1>
-          <p className="text-purple-100">Sistema de Pedidos - Cantina SESI</p>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Seu nome" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+              <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="Seu nome" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Matrícula *</label>
-                <input type="text" name="registration" value={formData.registration} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Matrícula</label>
+                <input type="text" name="registration" value={formData.registration} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="00000" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Turma *</label>
-                <select name="class" value={formData.class} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                <select name="class" value={formData.class} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition bg-white">
                   <option value="">Selecione</option>
                   <option value="1º Ano A">1º Ano A</option>
                   <option value="2º Ano A">2º Ano A</option>
@@ -115,35 +112,57 @@ export function Register({ onRegister, onBackToLogin }: RegisterProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="exemplo@sesi.com" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="seu.email@sesi.edu.br" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone *</label>
-              <input type="tel" name="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: formatPhone(e.target.value)})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="(00) 00000-0000" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+              <input type="tel" name="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: formatPhone(e.target.value)})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="(00) 00000-0000" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••••" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar *</label>
-                <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar</label>
+                <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••••" />
               </div>
             </div>
 
-            {error && <div className="text-red-600 text-sm bg-red-50 p-2 rounded border border-red-200">{error}</div>}
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded text-sm font-medium">
+                {error}
+              </div>
+            )}
 
-            <button type="submit" disabled={loading} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition disabled:opacity-50">
-              {loading ? 'Processando...' : 'Finalizar Cadastro'}
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className={`w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-bold flex justify-center items-center shadow-md ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Criando conta...
+                </>
+              ) : 'Finalizar Cadastro'}
             </button>
 
-            <button type="button" onClick={onBackToLogin} className="w-full text-gray-500 text-sm hover:underline">
-              Voltar para o Login
-            </button>
+            <div className="text-center mt-6">
+              <button 
+                type="button" 
+                onClick={onBackToLogin} 
+                className="text-sm text-gray-600 hover:text-indigo-600 font-medium transition"
+              >
+                Já tem uma conta? <span className="font-bold underline underline-offset-4">Faça login</span>
+              </button>
+            </div>
           </form>
         </div>
       </div>

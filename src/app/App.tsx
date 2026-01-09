@@ -4,16 +4,7 @@ import { Register } from './components/Register';
 import { StudentDashboard } from './components/StudentDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 
-export interface User {
-  id: string | number;
-  name: string;
-  email: string;
-  role: 'STUDENT' | 'ADMIN'; 
-  className?: string;
-  balance: number;
-  phone?: string;
-  registration?: string;
-}
+// --- INTERFACES ATUALIZADAS ---
 
 export interface Product {
   id: number;
@@ -24,6 +15,18 @@ export interface Product {
   image: string;
   available: boolean;
   stock: number;
+}
+
+export interface User {
+  id: string | number;
+  name: string;
+  email: string;
+  role: 'STUDENT' | 'ADMIN'; 
+  className?: string;
+  balance: number;
+  phone?: string;
+  registration?: string;
+  favorites?: Product[]; 
 }
 
 export interface CartItem {
@@ -41,23 +44,44 @@ export interface Order {
   paymentMethod: string;
   createdAt: string;
   pickupCode?: string;
+  cancelReason?: string; // Motivo salvo no banco
+}
+
+export interface SupportMessage {
+  id: string;
+  userId: string | number;
+  userName: string;
+  userEmail: string;
+  userClass?: string;
+  message: string;
+  status: 'open' | 'resolved';
+  createdAt: string;
+  response?: string;
+  respondedAt?: string;
 }
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
 
-  // 1. Carregar usuário do LocalStorage ao iniciar
+  // 1. Carregar usuário e mensagens do LocalStorage
   useEffect(() => {
     const savedUser = localStorage.getItem('sesiUser');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+
+    const savedMessages = localStorage.getItem('sesiSupportMessages');
+    if (savedMessages) {
+      setSupportMessages(JSON.parse(savedMessages));
+    }
   }, []);
 
-  // 2. Buscar Produtos do Banco de Dados
+  // 2. Buscar Produtos
   const fetchProducts = async () => {
     try {
       const response = await fetch('http://localhost:8080/api/produtos');
@@ -74,7 +98,7 @@ export default function App() {
     fetchProducts();
   }, []);
 
-  // 3. Buscar pedidos da API (MySQL)
+  // 3. Buscar pedidos da API (Polling de 30s)
   useEffect(() => {
     if (!user) return;
 
@@ -99,34 +123,26 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // --- FUNÇÕES DE PRODUTOS (BACKEND) ---
+  // --- FUNÇÕES DE PRODUTOS ---
 
-  // EXCLUIR PRODUTO
   const handleDeleteProduct = async (productId: string | number) => {
     try {
       const response = await fetch(`http://localhost:8080/api/produtos/${productId}`, {
         method: 'DELETE'
       });
-
       if (response.ok) {
-        // Remove da lista local para atualizar a interface imediatamente
         setProducts(prev => prev.filter(p => p.id.toString() !== productId.toString()));
-      } else {
-        alert("Erro ao excluir produto no banco de dados.");
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
-      alert("Servidor offline ou erro de rede.");
+      alert("Erro ao excluir produto.");
     }
   };
 
-  // ATUALIZAR ESTOQUE
   const handleUpdateStock = async (productId: string | number, newStock: number) => {
     try {
       const response = await fetch(`http://localhost:8080/api/produtos/${productId}/estoque?quantidade=${newStock}`, {
         method: 'PATCH'
       });
-
       if (response.ok) {
         setProducts(prev => prev.map(p => 
           p.id.toString() === productId.toString() ? { ...p, stock: newStock } : p
@@ -155,19 +171,54 @@ export default function App() {
     setOrders(prev => [newOrder, ...prev]);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string | number, status: Order['status']) => {
+  // Atualização de Status padrão (Admin)
+  const handleUpdateOrderStatus = async (orderId: string | number, status: Order['status'], reason?: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/pedidos/${orderId}/status?novoStatus=${status}`, {
-        method: 'PATCH'
+      const response = await fetch(`http://localhost:8080/api/pedidos/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason }) // O motivo pode ser enviado aqui também
       });
       
       if (response.ok) {
         setOrders(prev => prev.map(order =>
-          order.id === orderId ? { ...order, status } : order
+          order.id === orderId ? { ...order, status, cancelReason: reason } : order
         ));
       }
     } catch (error) {
-      alert("Erro ao atualizar status no servidor.");
+      alert("Erro ao atualizar status.");
+    }
+  };
+
+  // NOVA FUNÇÃO: Cancelamento específico com motivo (Cliente)
+  const handleCancelOrder = async (orderId: string | number, reason: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/pedidos/${orderId}/cancelar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled', reason: reason })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Atualiza pedidos localmente
+        setOrders(prev => prev.map(order =>
+          order.id.toString() === orderId.toString() 
+            ? { ...order, status: 'cancelled', cancelReason: reason } 
+            : order
+        ));
+
+        // Atualiza saldo se o banco retornar o estorno
+        if (data.updatedBalance !== undefined) {
+          handleUpdateBalance(data.updatedBalance);
+        }
+      } else {
+        throw new Error("Erro no servidor");
+      }
+    } catch (error) {
+      console.error("Erro no cancelamento:", error);
+      throw error;
     }
   };
 
@@ -179,7 +230,48 @@ export default function App() {
     }
   };
 
-  // --- Roteamento ---
+  const handleToggleFavorite = async (productId: string | number) => {
+    if (!user) return;
+    try {
+      const response = await fetch(`http://localhost:8080/api/users/${user.id}/favorites/${productId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        const updatedUser: User = await response.json();
+        setUser(updatedUser);
+        localStorage.setItem('sesiUser', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error("Erro ao favoritar:", error);
+    }
+  };
+
+  // --- SUPORTE ---
+
+  const handleSendSupportMessage = (message: Omit<SupportMessage, 'id' | 'createdAt' | 'status'>) => {
+    const newMessage: SupportMessage = {
+      ...message,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      status: 'open'
+    };
+    const updatedMessages = [...supportMessages, newMessage];
+    setSupportMessages(updatedMessages);
+    localStorage.setItem('sesiSupportMessages', JSON.stringify(updatedMessages));
+  };
+
+  const handleResolveSupportMessage = (messageId: string, response: string) => {
+    const updatedMessages = supportMessages.map(msg =>
+      msg.id === messageId
+        ? { ...msg, status: 'resolved' as const, response, respondedAt: new Date().toISOString() }
+        : msg
+    );
+    setSupportMessages(updatedMessages);
+    localStorage.setItem('sesiSupportMessages', JSON.stringify(updatedMessages));
+  };
+
+  // --- ROTEAMENTO ---
 
   if (!user) {
     if (isRegistering) {
@@ -193,20 +285,26 @@ export default function App() {
       user={user}
       products={products}
       orders={orders}
+      supportMessages={supportMessages}
       onLogout={handleLogout}
       onUpdateOrderStatus={handleUpdateOrderStatus}
       onDeleteProduct={handleDeleteProduct}
       onUpdateStock={handleUpdateStock}
-      onAddProduct={() => fetchProducts()} // Recarrega após adicionar
+      onAddProduct={() => fetchProducts()}
+      onResolveSupportMessage={handleResolveSupportMessage}
     />
   ) : (
     <StudentDashboard
       user={user}
       products={products}
       orders={orders}
+      supportMessages={supportMessages.filter(m => m.userId.toString() === user.id.toString())}
       onLogout={handleLogout}
       onPlaceOrder={handlePlaceOrder}
       onUpdateBalance={handleUpdateBalance}
+      onToggleFavorite={handleToggleFavorite}
+      onSendSupportMessage={handleSendSupportMessage}
+      onCancelOrder={handleCancelOrder}
     />
   );
 }

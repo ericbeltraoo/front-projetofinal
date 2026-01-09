@@ -11,7 +11,6 @@ interface AddProductModalProps {
   onSave: (productData: any) => Promise<void>; 
 }
 
-// --- Componente do Modal com trava Anti-Duplicação ---
 function AddProductModal({ isOpen, onClose, onSave }: AddProductModalProps) {
   const [formData, setFormData] = useState({
     name: '', description: '', price: '', category: 'Lanches', stock: '', image: ''
@@ -45,14 +44,45 @@ function AddProductModal({ isOpen, onClose, onSave }: AddProductModalProps) {
       <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
         <h2 className="text-xl font-bold mb-4 text-gray-800">Novo Produto</h2>
         <div className="space-y-4">
-          <input placeholder="Nome do Produto" className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, name: e.target.value})} />
-          <textarea placeholder="Descrição" className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, description: e.target.value})} />
+          <input 
+            placeholder="Nome do Produto" 
+            className="w-full border p-2 rounded-lg" 
+            value={formData.name}
+            onChange={e => setFormData({...formData, name: e.target.value})} 
+          />
+          <textarea 
+            placeholder="Descrição" 
+            className="w-full border p-2 rounded-lg" 
+            value={formData.description}
+            onChange={e => setFormData({...formData, description: e.target.value})} 
+          />
           <div className="flex gap-2">
-            <input placeholder="Preço" type="number" className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, price: e.target.value})} />
-            <input placeholder="Estoque Inicial" type="number" className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, stock: e.target.value})} />
+            <input 
+              placeholder="Preço" 
+              type="number" 
+              className="w-full border p-2 rounded-lg" 
+              value={formData.price}
+              onChange={e => setFormData({...formData, price: e.target.value})} 
+            />
+            <input 
+              placeholder="Estoque Inicial" 
+              type="number" 
+              className="w-full border p-2 rounded-lg" 
+              value={formData.stock}
+              onChange={e => setFormData({...formData, stock: e.target.value})} 
+            />
           </div>
-          <input placeholder="URL da Imagem" className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, image: e.target.value})} />
-          <select className="w-full border p-2 rounded-lg" onChange={e => setFormData({...formData, category: e.target.value})}>
+          <input 
+            placeholder="URL da Imagem" 
+            className="w-full border p-2 rounded-lg" 
+            value={formData.image}
+            onChange={e => setFormData({...formData, image: e.target.value})} 
+          />
+          <select 
+            className="w-full border p-2 rounded-lg" 
+            value={formData.category}
+            onChange={e => setFormData({...formData, category: e.target.value})}
+          >
             <option value="Lanches">Lanches</option>
             <option value="Bebidas">Bebidas</option>
             <option value="Sobremesas">Sobremesas</option>
@@ -86,7 +116,7 @@ interface AdminDashboardProps {
   orders: Order[];
   onLogout: () => void;
   onUpdateOrderStatus: (orderId: string | number, status: Order['status']) => void;
-  onDeleteProduct: (productId: string) => Promise<void>; // NOVA PROP ADICIONADA
+  onDeleteProduct: (productId: string) => Promise<void>;
 }
 
 type Tab = 'orders' | 'pickup' | 'stock' | 'dashboard';
@@ -147,7 +177,6 @@ export function AdminDashboard({ user, orders, onLogout, onUpdateOrderStatus, on
     }
   };
 
-  // Função interna para gerenciar a exclusão e atualizar o estado local
   const handleDeleteProductInternal = async (productId: string) => {
     await onDeleteProduct(productId);
     setProducts(prev => prev.filter(p => p.id.toString() !== productId));
@@ -262,9 +291,18 @@ export function AdminDashboard({ user, orders, onLogout, onUpdateOrderStatus, on
                 return (
                   <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <div>
+                      <div className="flex-1">
                         <span className="font-bold text-gray-900">#{order.id}</span>
                         <p className="text-sm text-gray-600">{order.userName}</p>
+                        
+                        {/* Layout de Motivo de Cancelamento solicitado */}
+                        {order.status === 'cancelled' && order.cancelReason && (
+                          <div className="mt-3 mb-3 p-3 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                            <p className="text-[10px] font-bold text-red-600 uppercase">Motivo do Cancelamento</p>
+                            <p className="text-sm text-red-800 italic">"{order.cancelReason}"</p>
+                          </div>
+                        )}
+
                         <span className={`mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.icon} {status.label}</span>
                       </div>
                       <p className="text-xl font-bold text-purple-600">R$ {order.total.toFixed(2)}</p>
@@ -275,9 +313,19 @@ export function AdminDashboard({ user, orders, onLogout, onUpdateOrderStatus, on
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      {order.status === 'pending' && <button onClick={() => onUpdateOrderStatus(order.id, 'preparing')} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">Iniciar Preparo</button>}
-                      {order.status === 'preparing' && <button onClick={() => onUpdateOrderStatus(order.id, 'ready')} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">Pronto para Retirada</button>}
-                      {order.status === 'ready' && <button onClick={() => onUpdateOrderStatus(order.id, 'completed')} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium">Entregue</button>}
+                      {order.status === 'pending' && <button onClick={() => onUpdateOrderStatus(order.id, 'preparing')} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Iniciar Preparo</button>}
+                      {order.status === 'preparing' && <button onClick={() => onUpdateOrderStatus(order.id, 'ready')} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">Pronto para Retirada</button>}
+                      {order.status === 'ready' && <button onClick={() => onUpdateOrderStatus(order.id, 'completed')} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Entregue</button>}
+                      
+                      {['pending', 'preparing', 'ready'].includes(order.status) && (
+                        <button 
+                          onClick={() => onUpdateOrderStatus(order.id, 'cancelled')} 
+                          className="px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
+                          title="Cancelar Pedido"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

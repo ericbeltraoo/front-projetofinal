@@ -3,9 +3,11 @@ import type { User, Order } from '../App';
 interface UserProfileProps {
   user: User;
   orders: Order[];
+  // Adicionamos esta função para permitir a navegação
+  onNavigate: (tab: 'catalog' | 'cart' | 'orders' | 'profile' | 'addBalance' | 'favorites' | 'support') => void;
 }
 
-export function UserProfile({ user, orders }: UserProfileProps) {
+export function UserProfile({ user, orders, onNavigate }: UserProfileProps) {
   const totalSpent = orders
     .filter(o => o.status !== 'cancelled')
     .reduce((sum, order) => sum + order.total, 0);
@@ -46,7 +48,6 @@ export function UserProfile({ user, orders }: UserProfileProps) {
 
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-500 mb-1">Matrícula</p>
-              {/* Puxa diretamente da coluna 'registration' do seu banco */}
               <p className="font-medium text-gray-900">{user.registration || 'Não encontrada'}</p>
             </div>
 
@@ -73,7 +74,10 @@ export function UserProfile({ user, orders }: UserProfileProps) {
             </svg>
           </div>
         </div>
-        <button className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition font-medium">
+        <button 
+          onClick={() => onNavigate('addBalance')}
+          className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition font-medium"
+        >
           Adicionar Saldo
         </button>
       </div>
@@ -117,11 +121,16 @@ export function UserProfile({ user, orders }: UserProfileProps) {
         </div>
       </div>
 
-      {/* Quick Actions (Estrutura original preservada) */}
+      {/* Quick Actions */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="font-bold text-gray-900 mb-4">Ações Rápidas</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          
+          {/* Botão Adicionar Saldo */}
+          <button 
+            onClick={() => onNavigate('addBalance')}
+            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
             <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -133,7 +142,11 @@ export function UserProfile({ user, orders }: UserProfileProps) {
             </div>
           </button>
 
-          <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          {/* Botão Histórico */}
+          <button 
+            onClick={() => onNavigate('orders')}
+            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -145,7 +158,11 @@ export function UserProfile({ user, orders }: UserProfileProps) {
             </div>
           </button>
 
-          <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          {/* Botão Favoritos */}
+          <button 
+            onClick={() => onNavigate('favorites')}
+            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -157,7 +174,11 @@ export function UserProfile({ user, orders }: UserProfileProps) {
             </div>
           </button>
 
-          <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          {/* Botão Suporte */}
+          <button 
+            onClick={() => onNavigate('support')}
+            className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
             <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
